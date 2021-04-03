@@ -5,10 +5,13 @@ import bodyParser from 'body-parser'
 import sockjs from 'sockjs'
 import { renderToStaticNodeStream } from 'react-dom/server'
 import React from 'react'
+import axios from 'axios'
 
 import cookieParser from 'cookie-parser'
 import config from './config'
 import Html from '../client/html'
+
+const { writeFile, readFile } = require('fs').promises
 
 require('colors')
 
@@ -25,15 +28,84 @@ let connections = []
 const port = process.env.PORT || 8090
 const server = express()
 
+const setHeaders = (req, res, next) => {
+  res.set('x-skillcrucial-user', '385666b1-bff5-11e9-95ba-1bf845c18f8d')
+  res.set('Access-Control-Expose-Headers', 'X-SKILLCRUCIAL-USER')
+  next()
+}
+
 const middleware = [
   cors(),
   express.static(path.resolve(__dirname, '../dist/assets')),
   bodyParser.urlencoded({ limit: '50mb', extended: true, parameterLimit: 50000 }),
   bodyParser.json({ limit: '50mb', extended: true }),
-  cookieParser()
+  cookieParser(),
+  setHeaders
 ]
 
 middleware.forEach((it) => server.use(it))
+
+server.get('/api/v1/ok', (req, res) => {
+  res.json({ status: 'OK' })
+})
+
+server.get('/api/v1/notok', (req, res) => {
+  res.json({ status: 'Not Ok' })
+})
+
+/*
+Для дискорда
+```
+<Свой код>
+```
+*/
+
+function getUsers() {
+  return readFile(`${__dirname}/data/users.json`, { encoding: 'utf8' })
+    .then((text) => {
+      return JSON.parse(text)
+    })
+    .catch(async () => {
+      const url = 'https://jsonplaceholder.typicode.com/users'
+      const result = await axios(url)
+        .then(({ data }) => {
+          writeFile(`${__dirname}/data/users.json`, JSON.stringify(data), { encoding: 'utf8' })
+          return data
+        })
+        .catch((err) => err)
+      return result
+    })
+}
+
+function addUser(userData, users = []) {
+  let newId = 1
+  if (users.length !== 0) {
+    const lastUser = users[users.length - 1]
+    newId = lastUser.id + 1
+  }
+  const newUser = { id: newId, ...userData }
+  const usersUpdated = [...users, newUser]
+  writeFile(`${__dirname}/data/users.json`, JSON.stringify(usersUpdated), { encoding: 'utf8' })
+  return { status: 'success', id: newId }
+}
+
+server.get('/api/v1/users', async (req, res) => {
+  const users = await getUsers()
+  res.json(users)
+})
+
+server.post('/api/v1/users', async (req, res) => {
+  const result = await readFile(`${__dirname}/data/users.json`, { encoding: 'utf8' })
+    .then((text) => {
+      const userList = JSON.parse(text)
+      return addUser(req.body, userList)
+    })
+    .catch(async () => {
+      return addUser(req.body)
+    })
+
+  res.json(result)
+})
 
 server.use('/api/', (req, res) => {
   res.status(404)
