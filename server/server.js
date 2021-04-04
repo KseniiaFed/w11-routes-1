@@ -11,7 +11,7 @@ import cookieParser from 'cookie-parser'
 import config from './config'
 import Html from '../client/html'
 
-const { writeFile, readFile } = require('fs').promises
+const { writeFile, readFile, unlink } = require('fs').promises
 
 require('colors')
 
@@ -105,6 +105,64 @@ server.post('/api/v1/users', async (req, res) => {
     })
 
   res.json(result)
+})
+
+server.get('/api/v1/users/:someParam', (req, res) => {
+  const { someParam } = req.params
+  console.log(req.params)
+  res.json({ param: someParam })
+})
+
+/*
+[{
+  id: 1,
+  name: 'Alec'
+},{
+  id: 2,
+  name: 'Max'
+},{
+  id: 3,
+  name: 'Pepe'
+}]
+*/
+
+server.patch('/api/v1/users/:userId', async (req, res) => {
+  const newData = req.body
+  const { userId } = req.params
+  await readFile(`${__dirname}/data/users.json`, { encoding: 'utf8' })
+    .then((text) => {
+      const users = JSON.parse(text)
+      const updatedUserList = users.map((user) => {
+        if (user.id === +userId) {
+          return { ...user, ...newData }
+        }
+        return user
+      })
+      writeFile(`${__dirname}/data/users.json`, JSON.stringify(updatedUserList), { encoding: 'utf8' })
+    })
+    .catch((err) => {
+      console.log(err)
+    })
+  res.json({ status: 'success', id: userId })
+})
+
+server.delete('/api/v1/users/:userId', async (req, res) => {
+  const { userId } = req.params
+  await readFile(`${__dirname}/data/users.json`, { encoding: 'utf8' })
+    .then((text) => {
+      const users = JSON.parse(text)
+      const updatedUserList = users.filter((user) => user.id !== +userId)
+      writeFile(`${__dirname}/data/users.json`, JSON.stringify(updatedUserList), { encoding: 'utf8' })
+    })
+    .catch((err) => {
+      console.log(err)
+    })
+  res.json({ status: 'success', id: userId })
+})
+
+server.delete('/api/v1/users', (req, res) => {
+  unlink(`${__dirname}/data/users.json`)
+  res.json({ status: 'success' })
 })
 
 server.use('/api/', (req, res) => {
