@@ -17,7 +17,6 @@ require('colors')
 
 let Root
 try {
-  // eslint-disable-next-line import/no-unresolved
   Root = require('../dist/assets/js/ssr/root.bundle').default
 } catch {
   console.log('SSR not found. Please run "yarn run build:ssr"'.red)
